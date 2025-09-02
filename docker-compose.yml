@@ -1,0 +1,107 @@
+networks:
+  private_network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.2.0.0/24
+
+services:
+  
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+  unbound:
+    image: "klutchell/unbound"
+    container_name: unbound
+    restart: unless-stopped
+    hostname: "unbound"
+    networks:
+      private_network:
+        ipv4_address: 10.2.0.200 		# Internal IP unbound
+
+  pihole:
+    depends_on: [unbound]
+    container_name: pihole
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    hostname: pihole
+    dns:
+      - 127.0.0.1
+      - 10.2.0.200 				# Points to unbound
+    environment:
+      TZ: "${TZ}"
+      FTLCONF_webserver_api_password: "${PIHOLE_PW}" 
+      TLCONF_dns_listeningMode: 'all'
+      ServerIP: 10.2.0.100 			# Internal IP of Pihole
+      DNS1: 10.2.0.200				# Unbound IP
+      DNS2: 10.2.0.200				# Specify 2nd one to not pick google
+    volumes:
+      - "./etc-pihole/:/etc/pihole/"
+      - "./etc-dnsmasq.d/:/etc/dnsmasq.d/"
+    cap_add:
+      - NET_ADMIN
+    networks:
+      private_network:
+        ipv4_address: 10.2.0.100
+    ports:
+      - "8080:80"
+      - "53:53/tcp" 
+      - "53:53/udp"
+
+  wg-easy:
+    depends_on: [unbound, pihole]
+    environment:
+      - WG_HOST=${WG_HOST}
+      - PASSWORD=${WG_PW}
+      - WG_PORT=51820
+      - WG_DEFAULT_ADDRESS=10.6.0.x
+      - WG_DEFAULT_DNS=10.2.0.100
+    image: ghcr.io/wg-easy/wg-easy:13
+    container_name: wg-easy
+    volumes:
+      - ~/wireguard:/etc/wireguard
+    ports:
+      - "51820:51820/udp"
+      - "51821:51821/tcp"
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    dns:
+      - 10.2.0.100				# Point to pihole
+      - 10.2.0.200				# Point to unbound
+    networks:
+      private_network:
+        ipv4_address: 10.2.0.3
+
+  freedns:
+    image: linuxserver/ddclient
+    container_name: freedns
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      - INTERVAL=300
+      - PROTOCOL=freedns
+      - SERVER=freedns.afraid.org
+      - HOST=${FDNS_HOST}
+      - USER=${FDNS_USER}
+      - PASSWORD=${FDNS_PW}
+    restart: unless-stopped
+    networks:
+      private_network:
+        ipv4_address: 10.2.0.150
+
+volumes:
+  portainer_data:
