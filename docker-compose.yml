@@ -56,16 +56,14 @@ services:
 
   wg-easy:
     depends_on: [unbound, pihole]
-    environment:
-      - WG_HOST=${WG_HOST}
-      - PASSWORD=${WG_PW}
-      - WG_PORT=51820
-      - WG_DEFAULT_ADDRESS=10.6.0.x
-      - WG_DEFAULT_DNS=10.2.0.100
-    image: ghcr.io/wg-easy/wg-easy:13
+    image: ghcr.io/wg-easy/wg-easy:15
     container_name: wg-easy
+    environment:
+      - INSECURE=true          # web UI over plain HTTP (LAN/VPN only)
+      - DISABLE_IPV6=true      # this Docker network has no IPv6
     volumes:
-      - ~/wireguard:/etc/wireguard
+      - ~/wireguard-v15:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
     ports:
       - "51820:51820/udp"
       - "51821:51821/tcp"
@@ -77,8 +75,8 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     dns:
-      - 10.2.0.100				# Point to pihole
-      - 10.2.0.200				# Point to unbound
+      - 10.2.0.100
+      - 10.2.0.200
     networks:
       private_network:
         ipv4_address: 10.2.0.3
