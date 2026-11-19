@@ -6,7 +6,7 @@ networks:
         - subnet: 10.2.0.0/24
 
 services:
-  
+
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
@@ -38,11 +38,9 @@ services:
       - 10.2.0.200 				# Points to unbound
     environment:
       TZ: "${TZ}"
-      FTLCONF_webserver_api_password: "${PIHOLE_PW}" 
-      TLCONF_dns_listeningMode: 'all'
-      ServerIP: 10.2.0.100 			# Internal IP of Pihole
-      DNS1: 10.2.0.200				# Unbound IP
-      DNS2: 10.2.0.200				# Specify 2nd one to not pick google
+      FTLCONF_webserver_api_password: "${PIHOLE_PW}"
+      FTLCONF_dns_listeningMode: 'all'
+      FTLCONF_dns_upstreams: '10.2.0.200#53'
     volumes:
       - "./etc-pihole/:/etc/pihole/"
       - "./etc-dnsmasq.d/:/etc/dnsmasq.d/"
@@ -53,7 +51,7 @@ services:
         ipv4_address: 10.2.0.100
     ports:
       - "8080:80"
-      - "53:53/tcp" 
+      - "53:53/tcp"
       - "53:53/udp"
 
   wg-easy:
@@ -92,12 +90,10 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ}
-      - INTERVAL=300
-      - PROTOCOL=freedns
-      - SERVER=freedns.afraid.org
-      - HOST=${FDNS_HOST}
-      - USER=${FDNS_USER}
-      - PASSWORD=${FDNS_PW}
+    volumes:
+      - ./ddclient:/config
+    dns:
+      - 10.2.0.200                      # Unbound directly, so it works while Pi-hole restarts
     restart: unless-stopped
     networks:
       private_network:
